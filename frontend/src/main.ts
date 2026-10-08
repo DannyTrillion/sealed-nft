@@ -1,4 +1,4 @@
-import { BrowserProvider, Contract, JsonRpcProvider, type Eip1193Provider } from "ethers";
+import { BrowserProvider, Contract, JsonRpcProvider, formatEther, type Eip1193Provider } from "ethers";
 import { Cipher, toast, short, revealOnScroll, animateEncBoxes } from "./ui";
 import { startRouter, go, type Route } from "./router";
 import { startStars } from "./stars";
@@ -358,6 +358,56 @@ async function sync() {
 }
 
 /** Disables controls, surfaces errors, re-syncs when done. */
+const FAUCET = "https://cloud.google.com/application/web3/faucet/ethereum/sepolia";
+
+/**
+ * Turns opaque provider failures into something a person can act on. ethers wraps
+ * a wallet error it cannot parse as "could not coalesce error", which tells the
+ * user nothing — and the usual cause is simply an unfunded wallet.
+ */
+function humanError(err: unknown): string {
+  const e = err as {
+    shortMessage?: string; message?: string; code?: string | number;
+    info?: { error?: { message?: string } };
+  };
+  const raw = `${e.info?.error?.message ?? ""} ${e.shortMessage ?? ""} ${e.message ?? ""}`;
+
+  if (e.code === 4001 || e.code === "ACTION_REJECTED") return "Request rejected in wallet.";
+  if (/user denied|user rejected/i.test(raw)) return "Request rejected in wallet.";
+  if (/insufficient funds|could not coalesce|gas required exceeds|INSUFFICIENT_FUNDS/i.test(raw))
+    return "This wallet has no Sepolia ETH, so it cannot pay gas. Fund it from a faucet and try again.";
+  if (/missing revert data|CALL_EXCEPTION|could not detect network/i.test(raw))
+    return "Could not reach the network. Try again in a moment.";
+  if (/AlreadyMinted/i.test(raw)) return "This address has already minted. One per address.";
+  return e.shortMessage ?? e.message ?? String(err);
+}
+
+/**
+ * Checks the wallet can actually pay for the mint before asking it to sign.
+ * Gas is estimated on our own RPC, so a flaky wallet endpoint cannot break it,
+ * and the figure is passed through as an explicit limit.
+ */
+async function preflightMint(): Promise<bigint> {
+  const rpc = readNft?.runner?.provider;
+  if (!rpc || !readNft || !state.account) throw new Error("Not connected.");
+
+  const [gas, fee, balance] = await Promise.all([
+    readNft.mint.estimateGas({ from: state.account }) as Promise<bigint>,
+    rpc.getFeeData(),
+    rpc.getBalance(state.account),
+  ]);
+
+  const price = fee.maxFeePerGas ?? fee.gasPrice ?? 0n;
+  const cost = gas * price;
+  if (balance < cost) {
+    throw new Error(
+      `This wallet holds ${formatEther(balance)} ETH but the mint needs about ` +
+        `${formatEther(cost)}. Fund it from a Sepolia faucet and try again.`,
+    );
+  }
+  return (gas * 12n) / 10n; // 20% headroom
+}
+
 function action(btn: HTMLButtonElement, fn: () => Promise<void>) {
   btn.addEventListener("click", async () => {
     const all = [connectBtn, mintBtn, revealBtn, publishBtn, duelGo];
@@ -367,9 +417,9 @@ function action(btn: HTMLButtonElement, fn: () => Promise<void>) {
     try {
       await fn();
     } catch (err: unknown) {
-      const e = err as { shortMessage?: string; message?: string; code?: string };
-      if (e.code === "ACTION_REJECTED") toast("Request rejected in wallet.");
-      else toast(e.shortMessage ?? e.message ?? String(err), "error");
+      const msg = humanError(err);
+      toast(msg, /rejected/i.test(msg) ? "info" : "error");
+      if (/faucet/i.test(msg)) toast(`Faucet: ${FAUCET}`, "info", 12000);
     } finally {
       delete btn.dataset.busy;
       all.forEach((b, i) => (b.disabled = before[i]));
@@ -528,9 +578,7 @@ connectBtn.addEventListener("click", async () => {
     await attachWallet();
     await sync();
   } catch (err: unknown) {
-    const e = err as { shortMessage?: string; message?: string; code?: string | number };
-    if (e.code === 4001 || e.code === "ACTION_REJECTED") toast("Connection rejected in wallet.");
-    else toast(e.shortMessage ?? e.message ?? String(err), "error");
+    toast(humanError(err), "error");
   } finally {
     delete connectBtn.dataset.busy;
     connectBtn.disabled = false;
@@ -551,8 +599,12 @@ action(mintBtn, async () => {
   state.revealed.clear();
   if (!nft) return toast("Connect a wallet first.", "error");
   if (!(await ensureChain())) return;
+
+  note("Checking this wallet can pay for the mint…");
+  const gasLimit = await preflightMint();
+
   toast("Minting — the coprocessor is drawing your essence.");
-  await (await nft.mint()).wait();
+  await (await nft.mint({ gasLimit })).wait();
   toast("Minted and sealed. Nobody can read it yet, including you.", "success");
 });
 
