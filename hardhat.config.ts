@@ -29,10 +29,13 @@ const config: HardhatUserConfig = {
     },
   },
   etherscan: {
-    apiKey: { sepolia: ETHERSCAN_API_KEY ?? "" },
+    // A single string (not a per-network map) is what selects the Etherscan V2
+    // API; the per-network form silently falls back to the retired V1 endpoint.
+    apiKey: ETHERSCAN_API_KEY ?? "",
   },
-  // Sourcify needs no API key, so the source is publicly checkable either way.
-  sourcify: { enabled: true },
+  // hardhat-verify 2.0.14 still calls Sourcify's removed v1 API, so leave it off
+  // here — Sourcify verification is done against their v2 endpoint directly.
+  sourcify: { enabled: false },
   typechain: {
     outDir: "typechain-types",
     target: "ethers-v6",

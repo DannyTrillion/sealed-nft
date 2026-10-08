@@ -32,7 +32,7 @@ provides, so no Sepolia key or RPC is required to see the whole flow work.
 |---|---|
 | App | **https://sealed-nft.vercel.app** |
 | Contract | [`0xe5076202af98b10C1af09c08FfD31174b0C7805c`](https://sepolia.etherscan.io/address/0xe5076202af98b10C1af09c08FfD31174b0C7805c) |
-| Source | Sourcify **exact match** ([repo](https://repo.sourcify.dev/11155111/0xe5076202af98b10C1af09c08FfD31174b0C7805c)) |
+| Source | verified on [Etherscan](https://sepolia.etherscan.io/address/0xe5076202af98b10C1af09c08FfD31174b0C7805c#code) and [Sourcify](https://repo.sourcify.dev/11155111/0xe5076202af98b10C1af09c08FfD31174b0C7805c) |
 | Supply | 10 tokens, 10 distinct holders · 1 published · 1 duel settled |
 
 Exercised against the live coprocessor and relayer, not only the mock:
