@@ -372,14 +372,32 @@ function humanError(err: unknown): string {
   };
   const raw = `${e.info?.error?.message ?? ""} ${e.shortMessage ?? ""} ${e.message ?? ""}`;
 
+  // Keep the real thing reachable; the mapping below is a courtesy, not a diagnosis.
+  console.error("[SealedNFT]", err);
+
   if (e.code === 4001 || e.code === "ACTION_REJECTED") return "Request rejected in wallet.";
   if (/user denied|user rejected/i.test(raw)) return "Request rejected in wallet.";
-  if (/insufficient funds|could not coalesce|gas required exceeds|INSUFFICIENT_FUNDS/i.test(raw))
-    return "This wallet has no Sepolia ETH, so it cannot pay gas. Fund it from a faucet and try again.";
-  if (/missing revert data|CALL_EXCEPTION|could not detect network/i.test(raw))
-    return "Could not reach the network. Try again in a moment.";
+
+  // Only claim "no funds" when the chain actually said so. preflightMint() checks
+  // the balance with real numbers and reports it precisely; guessing here once
+  // told a funded wallet it was empty.
+  if (/insufficient funds|gas required exceeds|INSUFFICIENT_FUNDS/i.test(raw))
+    return "This wallet cannot cover gas. Fund it from a Sepolia faucet and try again.";
+
+  // ethers collapses any wallet RPC error it cannot parse into this. It means the
+  // wallet failed to broadcast, which is nearly always its own endpoint.
+  if (/could not coalesce|-32603|internal json-rpc|missing revert data|CALL_EXCEPTION/i.test(raw))
+    return (
+      "Your wallet could not reach Sepolia. Its RPC endpoint is failing — in MetaMask open " +
+      "Settings → Networks → Sepolia and set the RPC URL to " +
+      "https://ethereum-sepolia-rpc.publicnode.com, then retry."
+    );
+
   if (/AlreadyMinted/i.test(raw)) return "This address has already minted. One per address.";
-  return e.shortMessage ?? e.message ?? String(err);
+  if (/could not detect network/i.test(raw)) return "Could not reach the network. Try again in a moment.";
+
+  const detail = (e.info?.error?.message ?? e.shortMessage ?? e.message ?? String(err)).slice(0, 160);
+  return `Transaction failed: ${detail}`;
 }
 
 /**
