@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0b10" />
+    <title>SealedNFT · Seen by all. Known by one.</title>
+    <meta name="description" content="An ERC-721 whose essence is encrypted on-chain with Zama's FHE. Ownership is public. Only the holder can look inside." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="canonical" href="https://sealed-nft.vercel.app/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://sealed-nft.vercel.app/" />
+    <meta property="og:site_name" content="SealedNFT" />
+    <meta property="og:title" content="Seen by all. Known by one." />
+    <meta property="og:description" content="An ERC-721 whose essence is encrypted on-chain with Zama FHE. Ownership is public; only the current holder can decrypt the trait." />
+    <meta property="og:image" content="https://sealed-nft.vercel.app/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="SealedNFT — eight tiles around an empty centre." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Seen by all. Known by one." />
+    <meta name="twitter:description" content="An ERC-721 whose essence is encrypted on-chain with Zama FHE." />
+    <meta name="twitter:image" content="https://sealed-nft.vercel.app/og.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+
+  <body>
+    <canvas class="sky" id="sky" aria-hidden="true"></canvas>
+
+    <div class="shell">
+      <header class="topbar">
+        <a class="brand" href="#/public">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="brand-name">Sealed<span class="brand-dim">NFT</span></span>
+        </a>
+
+        <nav class="tabs">
+          <a class="tab" data-route="public" href="#/public">Public</a>
+          <a class="tab" data-route="you" href="#/you">For you</a>
+          <a class="tab" data-route="how" href="#/how">How it works</a>
+        </nav>
+
+        <div class="topbar-right">
+          <button class="net" id="net" type="button" hidden><i></i><span id="netName">—</span></button>
+
+          <div class="wallet" id="wallet">
+            <button class="btn btn-accent" id="connect" aria-haspopup="menu" aria-expanded="false">
+              Connect wallet
+            </button>
+            <div class="menu" id="walletMenu" role="menu" hidden>
+              <div class="menu-head">
+                <span class="menu-k">Connected wallet</span>
+                <span class="menu-addr mono" id="menuAddr">—</span>
+              </div>
+              <button class="menu-item" id="menuCopy" role="menuitem">Copy address</button>
+              <a class="menu-item" id="menuExplorer" role="menuitem" target="_blank" rel="noreferrer">
+                View on explorer
+              </a>
+              <button class="menu-item is-danger" id="menuDisconnect" role="menuitem">Disconnect</button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main>
+        <!-- ══ PUBLIC ═════════════════════════════════════════════ -->
+        <section class="page" data-route="public" hidden>
+          <div class="pagehead">
+            <div>
+              <p class="eyebrow">Everything anyone can learn</p>
+              <h1>Seen by all.</h1>
+              <p class="lede">
+                Every holder below is public, forever, like any ERC-721. Every mark is unique,
+                generated on-chain from a token id that was never secret. None of them shows
+                you the essence.
+              </p>
+            </div>
+          </div>
+
+          <div class="tiles">
+            <div class="tile"><span class="t-k">Minted</span><span class="t-v mono" id="statMinted">—</span><span class="t-s">of an open supply</span></div>
+            <div class="tile"><span class="t-k">Holders</span><span class="t-v mono" id="statHolders">—</span><span class="t-s">all public</span></div>
+            <div class="tile"><span class="t-k">Essences readable</span><span class="t-v" id="statReadable">0</span><span class="t-s">by you, from this page</span></div>
+            <div class="tile"><span class="t-k">Contract</span><a class="t-v mono link" id="statContract" target="_blank" rel="noreferrer">not deployed</a><span class="t-s" id="statChain">—</span></div>
+          </div>
+
+          <div class="panel section">
+            <div class="panel-head">
+              <h2>The collection</h2>
+              <span class="meta mono" id="gridCount">—</span>
+            </div>
+            <div class="grid" id="grid"></div>
+            <p class="section-note">
+              Each mark is drawn from its token id alone — never from the sealed value, which
+              would leak it. The handle under each card is the real 32-byte ciphertext; copy one
+              and try it from any address you like.
+            </p>
+          </div>
+        </section>
+
+        <!-- ══ FOR YOU ════════════════════════════════════════════ -->
+        <section class="page" data-route="you" hidden>
+          <div class="pagehead">
+            <div>
+              <p class="eyebrow">What only you can reach</p>
+              <h1 id="youTitle">Known by one.</h1>
+              <p class="lede" id="youLede">
+                One token per address. Its essence was drawn inside the coprocessor and sealed
+                to you by an on-chain ACL — the only reason the relayer will ever open it.
+              </p>
+            </div>
+            <div class="seg" id="seg" role="group" aria-label="Point of view" hidden>
+              <button class="seg-btn is-active" data-pov="public">The public</button>
+              <button class="seg-btn" data-pov="holder">You</button>
+            </div>
+          </div>
+
+          <!-- state: no wallet / no token -->
+          <div class="panel standin" id="standin" hidden>
+            <span class="bracket tl"></span><span class="bracket tr"></span>
+            <span class="bracket bl"></span><span class="bracket br"></span>
+            <div class="mark8 is-ghost" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b><i></i><i></i><i></i><i></i></div>
+            <h2 id="standinTitle">Nothing sealed to you yet.</h2>
+            <p id="standinText">Connect a wallet to see whether one is.</p>
+            <div class="standin-cta">
+              <button class="btn btn-accent" id="standinAction">Connect wallet</button>
+            </div>
+          </div>
+
+          <!-- state: you hold one -->
+          <div class="panel detail" id="detail" data-state="idle" hidden>
+            <span class="bracket tl"></span><span class="bracket tr"></span>
+            <span class="bracket bl"></span><span class="bracket br"></span>
+
+            <div class="detail-top">
+              <span class="chip" id="chip"><i></i><span id="chipText">Sealed</span></span>
+              <span class="tokenid mono" id="tokenId">#—</span>
+            </div>
+
+            <div class="markwrap">
+              <img class="tokenart" id="tokenArt" alt="" />
+              <div class="readout">
+                <span class="readout-label">Power</span>
+                <span class="readout-value mono" id="power">••••</span>
+                <span class="readout-max mono" id="powerMax" hidden>/ 100</span>
+                <div class="gauge" id="gauge" aria-hidden="true">
+                  <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                </div>
+                <p class="readout-note">
+                  The mark is public and drawn from the token id. The gauge is not — it only
+                  fills once the relayer hands you the number.
+                </p>
+              </div>
+            </div>
+
+            <div class="handle-row">
+              <span class="k">Ciphertext handle</span>
+              <code class="handle mono" id="handle">—</code>
+              <button class="mini" id="copyHandle" hidden>Copy</button>
+            </div>
+
+            <div class="specs">
+              <div class="spec"><span class="k">Holder</span><span class="v mono" id="sHolder">—</span></div>
+              <div class="spec"><span class="k">Standard</span><span class="v">ERC-721</span></div>
+              <div class="spec"><span class="k">Trait type</span><span class="v mono">euint8</span></div>
+              <div class="spec"><span class="k">Range</span><span class="v mono">1 – 100</span></div>
+              <div class="spec"><span class="k">Who can decrypt</span><span class="v" id="sAcl">—</span></div>
+              <div class="spec"><span class="k">Drawn by</span><span class="v">FHE coprocessor</span></div>
+            </div>
+
+            <div class="cta">
+              <button class="btn btn-ghost" id="mint" hidden>Mint</button>
+              <button class="btn btn-ghost" id="publish">Publish it, for good</button>
+              <button class="btn btn-accent" id="reveal">Reveal my essence</button>
+            </div>
+            <p class="note" id="note"></p>
+          </div>
+          <div class="panel section duelpanel" id="duelPanel" hidden>
+            <div class="panel-head">
+              <h2>Settle it without telling anyone</h2>
+              <span class="meta mono" id="duelCount">—</span>
+            </div>
+            <div class="duel-body">
+              <p class="duel-copy">
+                The contract compares two sealed powers on ciphertext and publishes a single
+                bit: who won. Neither number is revealed — not to you, not to your opponent,
+                not to the chain.
+              </p>
+              <div class="duel-row">
+                <span class="duel-me mono" id="duelMe">#—</span>
+                <span class="duel-vs">vs</span>
+                <select class="duel-pick" id="duelPick" aria-label="Opponent"></select>
+                <button class="btn btn-accent" id="duelGo">Duel</button>
+              </div>
+              <p class="duel-out" id="duelOut"></p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ══ HOW IT WORKS ═══════════════════════════════════════ -->
+        <section class="page" data-route="how" hidden>
+          <div class="pagehead">
+            <div>
+              <p class="eyebrow">The mechanism</p>
+              <h1>Compute on what<br />you cannot read.</h1>
+              <p class="lede">
+                Fully homomorphic encryption lets a contract operate on values it never sees.
+                Everything below happens on Sepolia, in public, without the number ever existing
+                in the clear on-chain.
+              </p>
+            </div>
+          </div>
+
+          <!-- the arithmetic demo -->
+          <div class="panel section reveal-on-scroll">
+            <div class="panel-head"><h2>What the contract can do blindfolded</h2></div>
+            <div class="fhe-demo">
+              <div class="fhe-row">
+                <div class="encbox"><span class="enc-k">enc(7)</span><span class="enc-v mono" data-enc>0000</span></div>
+                <span class="fhe-op">+</span>
+                <div class="encbox"><span class="enc-k">enc(5)</span><span class="enc-v mono" data-enc>0000</span></div>
+                <span class="fhe-op">=</span>
+                <div class="encbox is-out"><span class="enc-k">enc(12)</span><span class="enc-v mono" data-enc>0000</span></div>
+              </div>
+              <p class="fhe-note">The contract adds them. It never sees 7, 5 or 12.</p>
+            </div>
+          </div>
+
+          <!-- the four steps -->
+          <div class="panel section reveal-on-scroll">
+            <div class="panel-head"><h2>Mint to reveal, end to end</h2></div>
+            <ol class="steps">
+              <li>
+                <span class="n mono">01</span><h3>The draw</h3>
+                <p><code>FHE.randEuint16()</code> asks the coprocessor for randomness that is encrypted from the instant it exists. It is folded into 1–100 with <code>rem</code> and <code>add</code> — all on ciphertext. No plaintext randomness appears in calldata, in an event, or in storage.</p>
+              </li>
+              <li>
+                <span class="n mono">02</span><h3>The seal</h3>
+                <p>Storage gets a 32-byte handle, not a value. <code>FHE.allowThis</code> lets the contract keep using it; <code>FHE.allow</code> names you. The ACL is the whole security model — possession of a handle grants nothing.</p>
+              </li>
+              <li>
+                <span class="n mono">03</span><h3>The look</h3>
+                <p>Your browser makes a throwaway keypair and signs an EIP-712 request scoped to this contract. The relayer checks the on-chain ACL, then re-encrypts the value to that keypair. The plaintext exists only in your tab.</p>
+              </li>
+              <li>
+                <span class="n mono">04</span><h3>The handover</h3>
+                <p>OpenZeppelin's <code>_update</code> hook fires on every transfer, extending the ACL to the incoming holder in the same transaction. Ownership was always public. The essence follows the token, not the minter.</p>
+              </li>
+            </ol>
+          </div>
+
+          <div class="panel section reveal-on-scroll">
+            <div class="panel-head"><h2>Worth knowing</h2></div>
+            <div class="caveats">
+              <div class="caveat">
+                <h3>Grants are permanent</h3>
+                <p>FHEVM has no revoke. A past holder keeps the ability to decrypt the handle they held, so “only the current holder” holds against anyone who <em>never</em> held it. Rotating the secret on transfer would mean redrawing the trait — a different product.</p>
+              </div>
+              <div class="caveat">
+                <h3>The draw has a small bias</h3>
+                <p><code>randEuint8(upperBound)</code> only takes powers of two, so the contract draws 16 bits and reduces mod 100. The bias is under 0.06% — fine for a cosmetic trait, not for anything adversarial.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="foot">
+        <span>Built with FHE on Zama · Sepolia</span>
+        <span class="mono" id="footContract">—</span>
+      </footer>
+    </div>
+
+    <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
