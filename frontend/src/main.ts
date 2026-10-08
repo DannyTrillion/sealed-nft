@@ -384,13 +384,22 @@ function humanError(err: unknown): string {
   if (/insufficient funds|gas required exceeds|INSUFFICIENT_FUNDS/i.test(raw))
     return "This wallet cannot cover gas. Fund it from a Sepolia faucet and try again.";
 
+  // Wallets ship rate-limited public RPCs (Rabby defaults to thirdweb, which
+  // returns 429 under load). The failure happens before signing, on the nonce
+  // lookup, so it looks like a contract problem and is not one.
+  if (/429|rate limit|too many requests/i.test(raw))
+    return (
+      "Your wallet's Sepolia RPC is rate-limited (HTTP 429). Point it at " +
+      "https://ethereum-sepolia-rpc.publicnode.com in your wallet's network settings and retry."
+    );
+
   // ethers collapses any wallet RPC error it cannot parse into this. It means the
   // wallet failed to broadcast, which is nearly always its own endpoint.
   if (/could not coalesce|-32603|internal json-rpc|missing revert data|CALL_EXCEPTION/i.test(raw))
     return (
-      "Your wallet could not reach Sepolia. Its RPC endpoint is failing — in MetaMask open " +
-      "Settings → Networks → Sepolia and set the RPC URL to " +
-      "https://ethereum-sepolia-rpc.publicnode.com, then retry."
+      "Your wallet could not reach Sepolia — its RPC endpoint is failing or rate-limited. " +
+      "Set the Sepolia RPC to https://ethereum-sepolia-rpc.publicnode.com in your wallet " +
+      "(Rabby: Settings → Custom RPC · MetaMask: Networks → Sepolia → Edit), then retry."
     );
 
   if (/AlreadyMinted/i.test(raw)) return "This address has already minted. One per address.";
