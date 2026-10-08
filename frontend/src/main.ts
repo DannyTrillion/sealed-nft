@@ -1,4 +1,4 @@
-import { BrowserProvider, Contract, JsonRpcProvider, formatEther, type Eip1193Provider } from "ethers";
+import { BrowserProvider, Contract, JsonRpcProvider, Wallet, formatEther, type Eip1193Provider } from "ethers";
 import { Cipher, toast, short, revealOnScroll, animateEncBoxes } from "./ui";
 import { startRouter, go, type Route } from "./router";
 import { startStars } from "./stars";
@@ -110,6 +110,17 @@ const state = {
   duels: 0,
   loading: true,
 };
+
+/**
+ * Local recording mode. With VITE_DEMO_KEY set in .env.local, the app signs with
+ * a throwaway key over its own RPC instead of an injected wallet — the chain work
+ * is identical, it just sidesteps a wallet whose endpoint is rate-limited.
+ *
+ * `import.meta.env.DEV` is statically false in a production build, so this whole
+ * branch is stripped from anything that ships.
+ */
+const DEMO_KEY = import.meta.env.DEV ? (import.meta.env.VITE_DEMO_KEY as string | undefined) : undefined;
+let demoSigner: Wallet | undefined;
 
 let provider: BrowserProvider;
 /** Signer-backed once connected; until then reads go through `readNft`. */
@@ -507,9 +518,15 @@ async function ensureChain(): Promise<boolean> {
 }
 
 /** Binds the signer-backed contract and flips the header into its connected state. */
+/** The EIP-712 signer: the demo key when recording, otherwise the wallet. */
+async function currentSigner() {
+  if (demoSigner) return demoSigner;
+  return provider.getSigner();
+}
+
 async function attachWallet() {
   provider = new BrowserProvider(window.ethereum!);
-  const signer = await provider.getSigner();
+  const signer = await currentSigner();
   state.account = await signer.getAddress();
   nft = new Contract(artifact.address, artifact.abi, signer);
 
@@ -601,7 +618,7 @@ connectBtn.addEventListener("click", async () => {
   connectBtn.dataset.busy = "true";
   try {
     await window.ethereum.request({ method: "eth_requestAccounts" });
-    if (!(await ensureChain())) return;
+    if (!demoSigner && !(await ensureChain())) return;
     await attachWallet();
     await sync();
   } catch (err: unknown) {
@@ -625,7 +642,7 @@ netPill.addEventListener("click", async () => {
 action(mintBtn, async () => {
   state.revealed.clear();
   if (!nft) return toast("Connect a wallet first.", "error");
-  if (!(await ensureChain())) return;
+  if (!demoSigner && !(await ensureChain())) return;
 
   note("Checking this wallet can pay for the mint…");
   const gasLimit = await preflightMint();
@@ -637,8 +654,8 @@ action(mintBtn, async () => {
 
 action(revealBtn, async () => {
   const row = state.rows.find((r) => r.id === state.mine);
-  if (!row || !provider) return;
-  if (!(await ensureChain())) return;
+  if (!row || (!provider && !demoSigner)) return;
+  if (!demoSigner && !(await ensureChain())) return;
 
   // Lazy: the SDK pulls a large WASM bundle, and failing to load it should cost
   // you the reveal, not the whole page.
@@ -659,7 +676,7 @@ action(revealBtn, async () => {
     }
     throw err;
   }
-  const signer = await provider.getSigner();
+  const signer = await currentSigner();
 
   // An ephemeral keypair the relayer re-encrypts to. The EIP-712 signature
   // authorizes that, scoped to this contract and a one-day window; the on-chain
@@ -719,7 +736,7 @@ action(revealBtn, async () => {
 action(publishBtn, async () => {
   const row = state.rows.find((r) => r.id === state.mine);
   if (!row || !nft) return;
-  if (!(await ensureChain())) return;
+  if (!demoSigner && !(await ensureChain())) return;
 
   // Irreversible at the protocol level — worth one deliberate confirmation.
   const ok = confirm(
@@ -737,7 +754,7 @@ action(duelGo, async () => {
   const row = state.rows.find((r) => r.id === state.mine);
   const opponent = BigInt(duelPick.value || "0");
   if (!row || !nft || opponent === 0n) return;
-  if (!(await ensureChain())) return;
+  if (!demoSigner && !(await ensureChain())) return;
 
   duelOut.removeAttribute("data-win");
   duelOut.textContent = "Comparing two ciphertexts on-chain…";
@@ -854,7 +871,28 @@ async function resume() {
   await sync();
 }
 
-resume().catch(() => {});
+async function startDemoMode(rpc: string) {
+  demoSigner = new Wallet(DEMO_KEY!, new JsonRpcProvider(rpc));
+  state.account = demoSigner.address;
+  nft = new Contract(artifact.address, artifact.abi, demoSigner);
+
+  netPill.hidden = false;
+  netName.textContent = "Sepolia";
+  connectBtn.textContent = short(state.account);
+  connectBtn.classList.remove("btn-accent");
+  connectBtn.classList.add("btn-ghost", "is-wallet");
+  menuAddr.textContent = state.account;
+  document.body.dataset.demo = "true"; // shows the badge
+  await sync();
+}
+
+if (DEMO_KEY && PUBLIC_RPC[artifact.chainId]) {
+  startDemoMode(PUBLIC_RPC[artifact.chainId]).catch((e) =>
+    toast(`Demo mode failed: ${(e as Error).message}`, "error"),
+  );
+} else {
+  resume().catch(() => {});
+}
 
 window.ethereum?.on?.("accountsChanged", () => window.location.reload());
 window.ethereum?.on?.("chainChanged", () => window.location.reload());
